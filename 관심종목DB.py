@@ -13,10 +13,6 @@ import os
 #코드리스트 저장되있는 파일 불러와서 DF생성
 os.chdir('C:\\Users\\SeungHun Hyun\\Anaconda3\\고웹\\Crawling')
 
-df = pd.read_excel('관심종목.xlsx')
-df.loc[:,'롯데컬처웍스']
-
-
 import pymysql
 
 db = pymysql.connect(
@@ -27,10 +23,6 @@ db = pymysql.connect(
         charset= 'utf8'
 )
 cursor = db.cursor(pymysql.cursors.DictCursor)
-#import time
-#time.strftime('%Y-%m-%d %H:%M:%S')
-#now = datetime.datetime(2009, 5, 5)
-#now = datetime.datetime.now()
 sql = '''INSERT INTO `interests` (user_id, item, code, createdAt, updatedAt, deletedAt)
     Values ('2', '엘앤에프','066970', {0}, {0}, {0});'''.format(now)
 

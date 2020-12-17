@@ -31,6 +31,14 @@ db = pymysql.connect(
         charset= 'utf8'
 )
 cursor = db.cursor(pymysql.cursors.DictCursor)
+sql = '''CREATE TABLE `itemCode` (
+`id` int(10) NOT NULL AUTO_INCREMENT,
+`item` varchar(30) NOT NULL,
+`code` varchar(15) NOT NULL,
+PRIMARY KEY(`id`)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+'''
+cursor.execute(sql) 
 
 for i in range(0, len(KS)):
     sql = '''INSERT INTO `itemCode` (item, code) Values ('{0}', '{1}');'''.format(KS.loc[i,'기업명'],KS.loc[i,'종목코드'])

@@ -13,7 +13,6 @@ import pandas as pd
 import datetime
 import pymysql
 
-
 #DB 테이블 접근
 db = pymysql.connect(
         user = 'root',
@@ -40,23 +39,8 @@ result = cursor.fetchall()
 interests = pd.DataFrame(result)
 interests = interests.set_index('item')
 len(interests)
-
-#키워드 테이블 접근
-sql = "SELECT * FROM `keywords`;"
-cursor.execute(sql)
-result = cursor.fetchall()
-keywords = pd.DataFrame(result)
-len(keywords)
-
-interests.loc[3,'item'] # 기업명
-interests.loc[3,'id'] #id
-keywords.loc[0,'interest_id']
-keywords.loc[0,'name']
-
-
 #########################################1분 간격으로 반복#############################################
 url = 'https://finance.naver.com/news/news_list.nhn?mode=LSS2D&section_id=101&section_id2=258'
-
 req = requests.get(url)
 html = req.text
 soup = BeautifulSoup(html, 'html.parser')#속보
@@ -66,50 +50,55 @@ article = soup.findAll(class_='articleSummary')#기사요약, 시간
 
 sliceSum = article[0].text.find('...\n\t')
 article[0].text[:sliceSum].replace('\n', '').replace('\t', '')
+
 title = [] #헤드라인 리스트
 time = []#시간
 summary = []#기사요약
-
 for i in range(0,20):
-    title.append(subject[i].text.replace('\n','')) 
+    title.append(subject[i].text.replace('\n','').replace('\'', ''))
     time.append(article[i].find(class_='wdate').text)
     sliceSum = article[i].text.find('...\n\t')
-    summary.append(article[i].text[:sliceSum].replace('\n', '').replace('\t', ''))
-title
-time
-summary
+    summary.append(article[i].text[:sliceSum].replace('\n', '').replace('\t', '').replace('\'', ''))
+#if(result[0]['keyword%d'%(0+1)]):
+#    print('업승ㅁ')
 
-
-for i in range(0,20):#한번 크롤링할때 기사 20개
-    for key in range(0,  len(keywords)):#키워드길이만큼 반복
-        if(title[i].find(keywords.loc[key,'name'])+1): #타이틀에 키워드 미포함시 -1리턴하므로 +1해줌
-            interest_id = keywords.loc[key,'interest_id']
-            sql = 'select * from interests where id=%d'%(interest_id)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            if(result):#종목명, 키워드 모두 포함했을때 posts에 추가
-#                df_article.loc[time[i]] = [title[i], summary[i], interest_id, time[i], ''] #중복된 기사는 더하지 않음.
-                print('있다')
-                now = str(datetime.datetime.now())
-                now = now[:19]
-                createdAt = now.replace('-', '').replace(':','').replace(' ', '')
-                time[i] = time[i]+'00'
-                time[i] = time[i].replace('-', '').replace(':','').replace(' ', '') 
-                time[i]
-                createdAt
-                time[i]
-                user_id = 2
-                sql = '''INSERT INTO `posts` (user_id, interest_id, headline, summary, upload_time, createdAt, updatedAt)
-                Values ({5}, '{0}', '{1}', '{2}', {3}, {4}, {4});'''.format(interest_id, title[i], summary[i],time[i], createdAt, user_id)
-                cursor.execute(sql)
-db.commit()
-
-sql = 'select * from posts;'
+sql = 'select * from interests'
 cursor.execute(sql)
 result = cursor.fetchall()
-result
-for i in range(0, len(result)):#포스트에 있는 interest_id로 종목코드 추출->현재가 크롤링후 업뎃
-    interest_id = result[i]['interest_id']
+now = str(datetime.datetime.now()) 
+now = now[:19]
+createdAt = now.replace('-', '').replace(':','').replace(' ', '')#생성된시간
+
+
+sql = 'SELECT * FROM posts;' #포스트에 중복된게 있는지 확인해야함.
+cursor.execute(sql) 
+resultPost = cursor.fetchall()
+for i in range(0,20):#한번 크롤링할때 기사 20개
+    for inter in range(0,  len(result)):#관심종목길이만큼 반복
+        if(title[i].find(result[inter]['item'])+1): #타이틀에 관심종목명 미포함시 -1리턴하므로 +1해줌        
+            time[i] = time[i]+'00'
+            time[i] = time[i].replace('-', '').replace(':','').replace(' ', '')
+            for j in range(0,10):#키워드는 최대10개이므로 반복
+                if(result[inter]['keyword%d'%(j+1)]):#키워드가 존재하면.
+                    num = 0
+                    num = title[i].find(result[inter]['keyword%d'%(j+1)])#타이틀안에 키워드가 존재.
+                    if(num>1):
+                        print('pass')
+                        interest_id = result[inter]['id']
+                        user_id = 2
+                        keyword_num = j+1
+                        sql = '''INSERT INTO `posts` (user_id, interest_id, keyword_num,headline, summary, upload_time, createdAt, updatedAt)
+                        Values ({0}, {1},{2}, '{3}', '{4}', {5}, {6}, {6});'''.format(user_id, interest_id, keyword_num, title[i], summary[i],time[i], createdAt)
+                        cursor.execute(sql)
+db.commit()
+
+
+
+sql = 'SELECT * FROM posts;'
+cursor.execute(sql) 
+resultPost = cursor.fetchall()
+for i in range(0, len(resultPost)):#포스트에 있는 interest_id로 종목코드 추출->현재가 크롤링후 업뎃
+    interest_id = resultPost[i]['interest_id']
     sql = 'select * from interests where id = %d;'%(interest_id)
     cursor.execute(sql)
     codeInfo = cursor.fetchall()
@@ -123,16 +112,12 @@ for i in range(0, len(result)):#포스트에 있는 interest_id로 종목코드 
     price = soup.find(class_ = 'no_today')#현재가
     price = price.find(class_='blind')
     price = price.text.replace(',', '')
-    
     fluct = soup.find(class_ = 'no_exday')#등락률
     fluct = fluct.findAll(class_='blind')[1]
     fluct = fluct.text
-    print(fluct)
     sql = 'UPDATE `posts` SET cur_price = {0} WHERE interest_id = {1};'.format(fluct, interest_id)
     cursor.execute(sql)
 db.commit()
-#    
-
 
             
 
@@ -141,30 +126,26 @@ now = str(datetime.datetime.now())
 now = now[:19]
 createdAt = now.replace('-', '').replace(':','').replace(' ', '')
 createdAt
+
+
 #기업명과 코드 연결
 name = '한진중공업'
-keyword1 = '컨소시엄'
 code = df.loc[name,'code']
+#포스트추가
+sql = '''INSERT INTO `posts` (user_id, interest_id, headline, upload_time, createdAt, updatedAt)
+    Values ('2', '{0}', {1}, {2}, {2});'''.format(interest_id, headline, upload_time, createdAt)
+
 #관심종목추가
-
+keyword = '컨소시엄'
 sql = '''INSERT INTO `interests` (user_id, item, code, createdAt, updatedAt, keyword1)
-    Values ('2', '{0}', '{1}', {2}, {2}, '{3}');'''.format(name, code, createdAt, keyword1)
+    Values ('2', '{0}', {1}, {2}, {2}, '{3}');'''.format(name, code, createdAt, keyword)
 
-interest_id = interests.loc[name].id
-keyword = 'OLED'
 
 cursor.execute(sql)
 db.commit()
 
 
 
-
-
-
-
-
-
-#delete from `interests` where id = 3;
 
 
 
