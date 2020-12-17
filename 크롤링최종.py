@@ -30,8 +30,6 @@ result = cursor.fetchall()
 df = pd.DataFrame(result)
 df = df.set_index('item')
 del df['id']
-
-
 #관심종목 테이블 접근
 sql = "SELECT * FROM `interests`;"
 cursor.execute(sql)
@@ -40,86 +38,91 @@ interests = pd.DataFrame(result)
 interests = interests.set_index('item')
 len(interests)
 #########################################1분 간격으로 반복#############################################
-url = 'https://finance.naver.com/news/news_list.nhn?mode=LSS2D&section_id=101&section_id2=258'
-req = requests.get(url)
-html = req.text
-soup = BeautifulSoup(html, 'html.parser')#속보
-
-subject = soup.findAll(class_='articleSubject')#헤드라인
-article = soup.findAll(class_='articleSummary')#기사요약, 시간
-
-sliceSum = article[0].text.find('...\n\t')
-article[0].text[:sliceSum].replace('\n', '').replace('\t', '')
-
-title = [] #헤드라인 리스트
-time = []#시간
-summary = []#기사요약
-for i in range(0,20):
-    title.append(subject[i].text.replace('\n','').replace('\'', ''))
-    time.append(article[i].find(class_='wdate').text)
-    sliceSum = article[i].text.find('...\n\t')
-    summary.append(article[i].text[:sliceSum].replace('\n', '').replace('\t', '').replace('\'', ''))
-#if(result[0]['keyword%d'%(0+1)]):
-#    print('업승ㅁ')
-
-sql = 'select * from interests'
-cursor.execute(sql)
-result = cursor.fetchall()
-now = str(datetime.datetime.now()) 
-now = now[:19]
-createdAt = now.replace('-', '').replace(':','').replace(' ', '')#생성된시간
-
-
-sql = 'SELECT * FROM posts;' #포스트에 중복된게 있는지 확인해야함.
-cursor.execute(sql) 
-resultPost = cursor.fetchall()
-for i in range(0,20):#한번 크롤링할때 기사 20개
-    for inter in range(0,  len(result)):#관심종목길이만큼 반복
-        if(title[i].find(result[inter]['item'])+1): #타이틀에 관심종목명 미포함시 -1리턴하므로 +1해줌        
-            time[i] = time[i]+'00'
-            time[i] = time[i].replace('-', '').replace(':','').replace(' ', '')
-            for j in range(0,10):#키워드는 최대10개이므로 반복
-                if(result[inter]['keyword%d'%(j+1)]):#키워드가 존재하면.
-                    num = 0
-                    num = title[i].find(result[inter]['keyword%d'%(j+1)])#타이틀안에 키워드가 존재.
-                    if(num>1):
-                        print('pass')
-                        interest_id = result[inter]['id']
-                        user_id = 2
-                        keyword_num = j+1
-                        sql = '''INSERT INTO `posts` (user_id, interest_id, keyword_num,headline, summary, upload_time, createdAt, updatedAt)
-                        Values ({0}, {1},{2}, '{3}', '{4}', {5}, {6}, {6});'''.format(user_id, interest_id, keyword_num, title[i], summary[i],time[i], createdAt)
-                        cursor.execute(sql)
-db.commit()
-
-
-
-sql = 'SELECT * FROM posts;'
-cursor.execute(sql) 
-resultPost = cursor.fetchall()
-for i in range(0, len(resultPost)):#포스트에 있는 interest_id로 종목코드 추출->현재가 크롤링후 업뎃
-    interest_id = resultPost[i]['interest_id']
-    sql = 'select * from interests where id = %d;'%(interest_id)
-    cursor.execute(sql)
-    codeInfo = cursor.fetchall()
-    code = codeInfo[0]['code']    
-    
-    url = 'https://finance.naver.com/item/main.nhn?code='+ code
+def crawlArticle():
+    url = 'https://finance.naver.com/news/news_list.nhn?mode=LSS2D&section_id=101&section_id2=258'
     req = requests.get(url)
     html = req.text
-    
-    soup = BeautifulSoup(html, 'html.parser')
-    price = soup.find(class_ = 'no_today')#현재가
-    price = price.find(class_='blind')
-    price = price.text.replace(',', '')
-    fluct = soup.find(class_ = 'no_exday')#등락률
-    fluct = fluct.findAll(class_='blind')[1]
-    fluct = fluct.text
-    sql = 'UPDATE `posts` SET cur_price = {0} WHERE interest_id = {1};'.format(fluct, interest_id)
+    soup = BeautifulSoup(html, 'html.parser')#속보
+    subject = soup.findAll(class_='articleSubject')#헤드라인
+    article = soup.findAll(class_='articleSummary')#기사요약, 시간
+    sliceSum = article[0].text.find('...\n\t')
+    article[0].text[:sliceSum].replace('\n', '').replace('\t', '')
+    title = [] #헤드라인 리스트
+    time = []#시간
+    summary = []#기사요약
+    for i in range(0,20):
+        title.append(subject[i].text.replace('\n','').replace('\'', ''))
+        time.append(article[i].find(class_='wdate').text)
+        sliceSum = article[i].text.find('...\n\t')
+        summary.append(article[i].text[:sliceSum].replace('\n', '').replace('\t', '').replace('\'', ''))
+    sql = 'select * from interests'#관심종목 DB로
     cursor.execute(sql)
-db.commit()
+    result = cursor.fetchall()
+    now = str(datetime.datetime.now()) 
+    now = now[:19]
+    createdAt = now.replace('-', '').replace(':','').replace(' ', '')#생성된시간
+    
+    for i in range(0,20):#한번 크롤링할때 기사 20개
+        for inter in range(0,  len(result)):#관심종목길이만큼 반복
+            if(title[i].find(result[inter]['item'])+1): #타이틀에 관심종목명 미포함시 -1리턴하므로 +1해줌        
+                time[i] = time[i]+'00'#date 형식 맞추기위해서
+                time[i] = time[i].replace('-', '').replace(':','').replace(' ', '')
+                for j in range(0,10):#키워드는 최대10개이므로 반복
+                    if(result[inter]['keyword%d'%(j+1)]):#키워드가 존재하면.
+                        sql = 'SELECT * FROM posts;' #포스트에 중복된게 있는지 확인해야함.
+                        cursor.execute(sql) 
+                        resultPost = cursor.fetchall()
+                        num = 0
+                        num = title[i].find(result[inter]['keyword%d'%(j+1)])#타이틀안에 키워드가 존재.
+                        if(num>0):
+                            interest_id = result[inter]['id']
+                            keyword_num = j+1
+                            user_id = result[inter]['user_id']
+                            if (len(resultPost)==0):#포스트에 아무것도없으면 중복체크 안해도 됌
+                                print('pass1')                        
+                                sql = '''INSERT INTO `posts` (user_id, interest_id, keyword_num,headline, summary, upload_time, createdAt, updatedAt)
+                                Values ({0}, {1},{2}, '{3}', '{4}', {5}, {6}, {6});'''.format(user_id, interest_id, keyword_num, title[i], summary[i],time[i], createdAt)
+                                cursor.execute(sql)
+                                db.commit()
+                                continue
+                            count = 0
+                            for post in range(0, len(resultPost)):#포스트리스트에서 겹치는거 있으면 인서트안함.                                
+                                if(resultPost[post]['keyword_num'] == keyword_num and resultPost[post]['interest_id']== interest_id) :
+                                    count+=1
+                            if(count==0):#모든 포스트리스트에서 겹치는게 없다면 추가
+                                print('pass2')                 
+                                sql = '''INSERT INTO `posts` (user_id, interest_id, keyword_num,headline, summary, upload_time, createdAt, updatedAt)
+                                Values ({0}, {1},{2}, '{3}', '{4}', {5}, {6}, {6});'''.format(user_id, interest_id, keyword_num, title[i], summary[i],time[i], createdAt)
+                                cursor.execute(sql)
+                                db.commit()    
 
-            
+def crawlPrice():                                   
+    sql = 'SELECT * FROM posts;'
+    cursor.execute(sql) 
+    resultPost = cursor.fetchall()
+    for i in range(0, len(resultPost)):#포스트에 있는 interest_id로 종목코드 추출->현재가 크롤링후 업뎃
+        interest_id = resultPost[i]['interest_id']
+        sql = 'select * from interests where id = %d;'%(interest_id)
+        cursor.execute(sql)
+        codeInfo = cursor.fetchall()
+        code = codeInfo[0]['code']    
+        
+        url = 'https://finance.naver.com/item/main.nhn?code='+ code
+        req = requests.get(url)
+        html = req.text
+        
+        soup = BeautifulSoup(html, 'html.parser')
+        price = soup.find(class_ = 'no_today')#현재가
+        price = price.find(class_='blind')
+        price = price.text.replace(',', '')
+        fluct = soup.find(class_ = 'no_exday')#등락률
+        fluct = fluct.findAll(class_='blind')[1]
+        fluct = fluct.text
+        sql = 'UPDATE `posts` SET cur_price = {0} WHERE interest_id = {1};'.format(fluct, interest_id)
+        cursor.execute(sql)
+    db.commit()
+crawlArticle()
+crawlPrice()        
 
 #현재시간
 now = str(datetime.datetime.now())
@@ -139,7 +142,11 @@ sql = '''INSERT INTO `posts` (user_id, interest_id, headline, upload_time, creat
 keyword = '컨소시엄'
 sql = '''INSERT INTO `interests` (user_id, item, code, createdAt, updatedAt, keyword1)
     Values ('2', '{0}', {1}, {2}, {2}, '{3}');'''.format(name, code, createdAt, keyword)
-
+#키워드추가
+keyword2 = '인보사'
+interest_id = 4
+sql = '''UPDATE `interests` SET keyword2 = '{0}' WHERE id = {1};'.format(keyword2, interest_id)'''
+cursor.execute(sql)
 
 cursor.execute(sql)
 db.commit()

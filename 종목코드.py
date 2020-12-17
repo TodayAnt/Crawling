@@ -20,9 +20,6 @@ for i in range(0, len(KQ)):#코드에 0붙여주기
     KQ.iloc[i,0] = str(KQ.iloc[i,0])
     while(len(KQ.iloc[i,0])<6):
         KQ.iloc[i,0] = '0' + KQ.iloc[i,0]    
-
-
-
 db = pymysql.connect(
         user = 'root',
         passwd = '1234',
