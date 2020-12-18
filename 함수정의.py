@@ -1,46 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Nov 11 19:02:07 2020
+Created on Fri Dec 18 13:42:11 2020
 
 @author: SeungHun Hyun
 """
-#기사가 나온 시간 시세 크롤링 셀레니움
-#DB연동
 
-import requests, json
-from bs4 import BeautifulSoup
-import pandas as pd
-import datetime
-import pymysql
-import schedule
-import time
-
-#DB 테이블 접근
-db = pymysql.connect(
-        user = 'root',
-        passwd = '1234',
-        host = '127.0.0.1',
-        db = 'today_ant',
-        charset= 'utf8'
-)
-cursor = db.cursor(pymysql.cursors.DictCursor)
-#종목명-코드 연동 데이터 불러오기
-sql = 'SELECT * FROM itemcode;'
-cursor.execute(sql) 
-result = cursor.fetchall()
-
-df = pd.DataFrame(result)
-df = df.set_index('item')
-del df['id']
-#관심종목 테이블 접근
-sql = "SELECT * FROM `interests`;"
-cursor.execute(sql)
-result = cursor.fetchall()
-interests = pd.DataFrame(result)
-interests = interests.set_index('item')
-
-
-checker = []#title 확인용
 #########################################1분 간격으로 반복#############################################
 def crawlArticle():
     url = 'https://finance.naver.com/news/news_list.nhn?mode=LSS3D&section_id=101&section_id2=258&section_id3=402'
@@ -92,7 +56,9 @@ def crawlArticle():
                                 sql = '''INSERT INTO `posts` (user_id, interest_id, keyword_num,headline, summary, upload_time, createdAt, updatedAt)
                                 Values ({0}, {1},{2}, '{3}', '{4}', {5}, {6}, {6});'''.format(user_id, interest_id, keyword_num, title[i], summary[i],timeArticle[i], createdAt)
                                 cursor.execute(sql)
+                                data = {'user_id' : user_id, 'interest_id' : interest_id, 'keyword_num' : keyword_num }
                                 db.commit()
+                                res = requests.post('http://localhost:8080/api/gmail', data=json.dumps(data))   
                                 continue
                             count = 0
                             for post in range(0, len(resultPost)):#포스트리스트에서 겹치는거 있으면 인서트안함.                                
@@ -130,27 +96,4 @@ def crawlPrice():
         print('post 현재가 업데이트')
         sql = 'UPDATE `posts` SET cur_price = {0}, fluct = {1} WHERE interest_id = {2};'.format(price, fluct, interest_id)
         cursor.execute(sql)
-        db.commit()                   
-#crawlArticle()
-#crawlPrice()
-#30초에 한번씩 실행
-schedule.every(30).seconds.do(crawlArticle)
-schedule.every(30).seconds.do(crawlPrice)
-while True: 
-    schedule.run_pending() 
-    time.sleep(1)
-
-
-#관심종목수동추가
-#now = str(datetime.datetime.now())
-#now = now[:19]
-#createdAt = now.replace('-', '').replace(':','').replace(' ', '')#추가시각
-#createdAt
-#name = '파미셀'
-#code = str(df.loc[name,'code'])
-#keyword1 = '공급계약'
-##keyword2 = ''
-#sql = '''INSERT INTO `interests` (user_id, item, code, createdAt, updatedAt, keyword1)
-#    Values ('2', '{0}', '{1}', {2}, {2}, '{3}');'''.format(name, code, createdAt, keyword1)
-#cursor.execute(sql)
-#db.commit()
+        db.commit()         
