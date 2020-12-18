@@ -36,8 +36,8 @@ result = cursor.fetchall()
 interests = pd.DataFrame(result)
 interests = interests.set_index('item')
 
-
-checker = []#title확인용. 한번크롤링할때마다 리스트에 타이틀append
+#schedule.every(3000).seconds.do(checker = [])
+#checker = []#title확인용. 한번크롤링할때마다 리스트에 타이틀append
 #crawlArticle()
 #crawlPrice()
 #30초에 한번씩 실행
